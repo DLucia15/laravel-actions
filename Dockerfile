@@ -1,24 +1,47 @@
-# --- STAGE 1: Build de Node (Assets) ---
+# --------------------------------------------------
+# STAGE 1: Build de Assets con Node
+# --------------------------------------------------
 FROM node:20-alpine AS node_builder
 WORKDIR /app
 
-COPY package*.json package-lock.json ./
+COPY package*.json ./
 RUN npm ci
 
 COPY . .
 RUN npm run build
 
-# --- STAGE 2: PHP Dependencies (Composer) ---
-FROM composer:2 AS composer_builder
+
+# --------------------------------------------------
+# STAGE 2: Instalar dependencias PHP (Composer)
+# --------------------------------------------------
+FROM php:8.2-fpm-alpine AS composer_builder
+
+# Dependencias necesarias para PHP + Composer
+RUN apk add --no-cache \
+    git unzip icu-dev oniguruma-dev zlib-dev libzip-dev sqlite-dev
+
+# Extensiones PHP necesarias por Laravel
+RUN docker-php-ext-configure intl \
+    && docker-php-ext-install intl mbstring zip pdo_mysql pdo_sqlite
+
+# Copiar composer desde la imagen oficial
+COPY --from=composer:2 /usr/bin/composer /usr/bin/composer
+
 WORKDIR /app
 
+# Copiar el proyecto generado por Node
 COPY --from=node_builder /app /app
+
+# Instalar dependencias PHP sin dev
 RUN composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 
-# --- STAGE 3: Final Image ---
+
+# --------------------------------------------------
+# STAGE 3: Imagen Final
+# --------------------------------------------------
 FROM php:8.2-fpm-alpine
 
-# Instalar dependencias del sistema y extensiones PHP necesarias
+# Dependencias del sistema y extensiones PHP
 RUN set -eux; \
     apk update; \
     apk add --no-cache --virtual .build-deps $PHPIZE_DEPS icu-dev oniguruma-dev libzip-dev sqlite-dev zlib-dev openssl-dev; \
@@ -28,22 +51,22 @@ RUN set -eux; \
     docker-php-ext-enable opcache; \
     apk del .build-deps
 
-# Extensiones básicas que no requieren compilación
+# Extensiones básicas
 RUN docker-php-ext-install ctype fileinfo tokenizer
 
 WORKDIR /var/www/html
 
-# Copiar aplicación y dependencias desde el stage de Composer
+# Copiar aplicación y dependencias instaladas
 COPY --from=composer_builder /app /var/www/html
 
-# Generar clave y caches de Laravel
+# Preparar Laravel
 RUN if [ ! -f .env ]; then cp .env.example .env; fi \
     && php artisan key:generate \
     && php artisan config:cache \
     && php artisan route:cache \
     && php artisan view:cache
 
-# Ajustar permisos
+# Permisos correctos
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/storage \
     && chmod -R 775 /var/www/html/bootstrap/cache
