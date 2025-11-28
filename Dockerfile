@@ -21,7 +21,7 @@ FROM php:8.2-fpm-alpine
 RUN set -eux; \
     apk update; \
     apk add --no-cache --virtual .build-deps $PHPIZE_DEPS icu-dev oniguruma-dev libzip-dev; \
-    apk add --no-cache icu git unzip curl bash sqlite; \
+    apk add --no-cache icu git unzip curl bash sqlite zip; \
     docker-php-ext-configure intl; \
     docker-php-ext-install -j"$(nproc)" pdo_mysql pdo_sqlite bcmath intl mbstring; \
     docker-php-ext-enable opcache; \
