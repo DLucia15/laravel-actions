@@ -51,9 +51,6 @@ RUN set -eux; \
     docker-php-ext-enable opcache; \
     apk del .build-deps
 
-# Extensiones básicas
-RUN docker-php-ext-install ctype fileinfo tokenizer
-
 WORKDIR /var/www/html
 
 # Copiar aplicación y dependencias instaladas
