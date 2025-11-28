@@ -18,7 +18,7 @@ class ConfirmablePasswordController extends Controller
     {
         return view('auth.confirm-password');
     }
-
+    //HOLA
     /**
      * Confirm the user's password.
      */
