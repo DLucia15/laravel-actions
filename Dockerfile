@@ -2,11 +2,9 @@
 FROM node:20-alpine AS node_builder
 WORKDIR /app
 
-# Copiamos package.json y package-lock.json
 COPY package*.json package-lock.json ./
 RUN npm ci
 
-# Copiamos el resto del código
 COPY . .
 RUN npm run build
 
@@ -14,46 +12,40 @@ RUN npm run build
 FROM composer:2 AS composer_builder
 WORKDIR /app
 
-# Copiamos el código y los assets construidos
 COPY --from=node_builder /app /app
 RUN composer install --no-dev --prefer-dist --optimize-autoloader --no-interaction
 
 # --- STAGE 3: Final Image ---
 FROM php:8.2-fpm-alpine
 
-# Paquetes + extensiones PHP necesarias para Laravel + SQLite/MySQL
+# Instalar dependencias del sistema y extensiones PHP necesarias
 RUN set -eux; \
     apk update; \
     apk add --no-cache --virtual .build-deps $PHPIZE_DEPS icu-dev oniguruma-dev libzip-dev sqlite-dev zlib-dev; \
-    apk add --no-cache icu git unzip curl bash zip; \
+    apk add --no-cache icu git unzip curl bash zip openssl; \
     docker-php-ext-configure intl; \
     docker-php-ext-install -j"$(nproc)" pdo_mysql pdo_sqlite bcmath intl mbstring zip; \
     docker-php-ext-enable opcache; \
     apk del .build-deps
 
-# Definimos el directorio de trabajo
 WORKDIR /var/www/html
 
-# Copiamos el código de la aplicación (con assets y dependencias) desde el stage de Composer
+# Copiar aplicación y dependencias desde el stage de Composer
 COPY --from=composer_builder /app /var/www/html
 
-# Ajustamos permisos y generamos la clave de la aplicación
+# Generar clave y caches de Laravel
 RUN if [ ! -f .env ]; then cp .env.example .env; fi \
     && php artisan key:generate \
     && php artisan config:cache \
     && php artisan route:cache \
     && php artisan view:cache
 
-# Ajustamos permisos para Laravel (storage, bootstrap/cache)
+# Ajustar permisos
 RUN chown -R www-data:www-data /var/www/html \
     && chmod -R 775 /var/www/html/storage \
     && chmod -R 775 /var/www/html/bootstrap/cache
 
-# Usuario no root por seguridad
 USER www-data
 
-# Exponer el puerto de PHP-FPM
 EXPOSE 9000
-
-# Comando por defecto
 CMD ["php-fpm"]
