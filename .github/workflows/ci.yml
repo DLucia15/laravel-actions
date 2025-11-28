@@ -37,10 +37,10 @@ jobs:
           sed -i 's/DB_DATABASE=.*/DB_DATABASE=:memory:/' .env
 
       - name: Run migrations
-        run: php artisan migrate --force --verbose
+        run: php artisan migrate --force
 
       - name: Run tests
-        run: php artisan test --no-coverage --verbose
+        run: php artisan test --no-coverage
 
   build:
     runs-on: ubuntu-latest
