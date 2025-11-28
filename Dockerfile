@@ -21,12 +21,15 @@ FROM php:8.2-fpm-alpine
 # Instalar dependencias del sistema y extensiones PHP necesarias
 RUN set -eux; \
     apk update; \
-    apk add --no-cache --virtual .build-deps $PHPIZE_DEPS icu-dev oniguruma-dev libzip-dev sqlite-dev zlib-dev; \
-    apk add --no-cache icu git unzip curl bash zip openssl; \
+    apk add --no-cache --virtual .build-deps $PHPIZE_DEPS icu-dev oniguruma-dev libzip-dev sqlite-dev zlib-dev openssl-dev; \
+    apk add --no-cache icu git unzip curl bash zip; \
     docker-php-ext-configure intl; \
     docker-php-ext-install -j"$(nproc)" pdo_mysql pdo_sqlite bcmath intl mbstring zip; \
     docker-php-ext-enable opcache; \
     apk del .build-deps
+
+# Extensiones básicas que no requieren compilación
+RUN docker-php-ext-install ctype fileinfo tokenizer
 
 WORKDIR /var/www/html
 
